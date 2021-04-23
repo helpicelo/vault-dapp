@@ -58,13 +58,12 @@ contract Vault is Ownable{
         require(msg.sender == lockedToken[_id].withdrawer, 'You are not the withdrawer!');
         require(lockedToken[_id].deposited, 'Tokens are not yet deposited!');
         require(!lockedToken[_id].withdrawn, 'Tokens are already withdrawn!');
-        
-        lockedToken[_id].withdrawn = true;
-        
-        walletTokenBalance[address(lockedToken[_id].token)][msg.sender] = walletTokenBalance[address(lockedToken[_id].token)][msg.sender].sub(lockedToken[_id].amount);
-        
-        emit Withdraw(msg.sender, lockedToken[_id].amount);
+
         lockedToken[_id].token.safeTransfer(msg.sender, lockedToken[_id].amount);
+
+        walletTokenBalance[address(lockedToken[_id].token)][msg.sender] = walletTokenBalance[address(lockedToken[_id].token)][msg.sender].sub(lockedToken[_id].amount);
+        lockedToken[_id].withdrawn = true;
+        emit Withdraw(msg.sender, lockedToken[_id].amount);
     }
     
     function getDepositsByTokenAddress(address _token) view external returns (uint256[] memory) {
