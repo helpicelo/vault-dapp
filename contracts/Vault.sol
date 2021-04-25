@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract Vault is Ownable{
+contract Vault is Ownable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -22,6 +22,7 @@ contract Vault is Ownable{
     
     uint256 public depositsCount;
     mapping (address => uint256[]) public depositsByTokenAddress;
+    mapping (address => uint256[]) public depositsByWithdrawers;
     mapping (uint256 => Items) public lockedToken;
     mapping (address => mapping(address => uint256)) public walletTokenBalance;
     
@@ -40,7 +41,7 @@ contract Vault is Ownable{
         require(_token.allowance(msg.sender, address(this)) >= _amount, 'Approve tokens first!');
         _token.safeTransferFrom(msg.sender, address(this), _amount);
         
-        walletTokenBalance[address(_token)][msg.sender] = walletTokenBalance[address(_token)][msg.sender];
+        walletTokenBalance[address(_token)][msg.sender] = walletTokenBalance[address(_token)][msg.sender].add(_amount);
         
         _id = ++depositsCount;
         lockedToken[_id].token = _token;
@@ -51,6 +52,9 @@ contract Vault is Ownable{
         lockedToken[_id].deposited = true;
         
         depositsByTokenAddress[address(_token)].push(_id);
+        depositsByWithdrawers[_withdrawer].push(_id);
+
+        return _id;
     }
     
     function withdrawTokens(uint256 _id) external {
@@ -58,18 +62,31 @@ contract Vault is Ownable{
         require(msg.sender == lockedToken[_id].withdrawer, 'You are not the withdrawer!');
         require(lockedToken[_id].deposited, 'Tokens are not yet deposited!');
         require(!lockedToken[_id].withdrawn, 'Tokens are already withdrawn!');
-
-        lockedToken[_id].token.safeTransfer(msg.sender, lockedToken[_id].amount);
-
-        walletTokenBalance[address(lockedToken[_id].token)][msg.sender] = walletTokenBalance[address(lockedToken[_id].token)][msg.sender].sub(lockedToken[_id].amount);
+        
         lockedToken[_id].withdrawn = true;
+        
+        walletTokenBalance[address(lockedToken[_id].token)][msg.sender] = walletTokenBalance[address(lockedToken[_id].token)][msg.sender].sub(lockedToken[_id].amount);
+        
         emit Withdraw(msg.sender, lockedToken[_id].amount);
+        lockedToken[_id].token.safeTransfer(msg.sender, lockedToken[_id].amount);
     }
     
-    function getDepositsByTokenAddress(address _token) view external returns (uint256[] memory) {
-        return depositsByTokenAddress[_token];
+    function getDepositsByTokenAddress(address _id) view external returns (uint256[] memory) {
+        return depositsByTokenAddress[_id];
     }
-    
+
+    function getDepositsByWithdrawer(address _token, address _withdrawer) view external returns (uint256) {
+        return walletTokenBalance[_token][_withdrawer];
+    }
+   
+    function getVaultsByWithdrawer(address _withdrawer) view external returns (uint256[] memory) {
+        return depositsByWithdrawers[_withdrawer];
+    }
+
+    function getVaultById(uint256 _id) view external returns (Items memory) {
+        return lockedToken[_id];
+    }
+
     function getTokenTotalLockedBalance(address _token) view external returns (uint256) {
        return IERC20(_token).balanceOf(address(this));
     }
